@@ -1,34 +1,91 @@
+##
+## hxssl
+##
 
-OS = Linux
-INSTALL_PATH = /usr/lib/neko/
-#SSL_FLAGS := $(shell pkg-config --cflags --libs libcrypto)
-NDLL = ndll/$(OS)/tls.ndll
-NEKOPATH = -I/usr/lib/neko/include
-OBJS = src/_bio.o src/_evp.o src/_hmac.o src/_ssl.o # src/_base64.o src/_hash.o
+PROJECT=hxssl
+OS=Linux
+DEBUG=false
+NDLL_FLAGS=
+HXCPP_FLAGS=
 
-all: build
+OS=$(shell sh -c 'uname -s 2>/dev/null || echo not')
+MACHINE=$(shell sh -c 'uname -m 2>/dev/null || echo not')
 
-src/%.o: src/%.c
-	$(CC) $(NEKOPATH) -c $< -o $@
+ifeq ($(OS),Linux)
+	ifeq ($(MACHINE),$(filter $(MACHINE),armv6l armv7l))
+		OS=RPi
+		NDLL_FLAGS+=-DRPi
+		HXCPP_FLAGS+=-D RPi
+	else ifeq ($(MACHINE),x86_64)
+		OS=Linux64
+		NDLL_FLAGS+=-DHXCPP_M64
+		HXCPP_FLAGS+=-D HXCPP_M64
+	else
+		OS=Linux
+	endif
+else ifeq ($(OS),Darwin)
+	ifeq ($(MACHINE),x86_64)
+		OS=Mac64
+		NDLL_FLAGS+=-DHXCPP_M64
+		HXCPP_FLAGS+=-D HXCPP_M64
+	else ifeq ($(MACHINE),i686)
+		OS=Mac
+	endif
+else ifeq ($(OS),Windows_NT)
+	OS=Windows
+	NDLL_FLAGS+=-DWindows
+	HXCPP_FLAGS+=-D Windows
+endif
 
-$(NDLL): $(OBJS)
-	$(CC) -shared -o $(NDLL) $(NEKOPATH)  $(shell pkg-config --cflags --libs libcrypto) $(OBJS) -lssl -lcrypto
-	
-build: $(NDLL)
+ifeq ($(DEBUG),true)
+	HXCPP_FLAGS+=-debug
+else
+	HXCPP_FLAGS+=--no-traces -dce full
+endif
 
-haxelib-zip: clean build
-	(cd ..; zip -r hxssl/hxssl.zip hxssl -x hxssl/.* hxssl/_* hxssl/src*.o hxssl/.git )
+NDLL=ndll/$(OS)/$(PROJECT).ndll
+SRC_CPP=src/*.cpp
+SRC_HX=sys/crypto/*.hx sys/ssl/*.hx
 
-haxelib-test: haxelib-zip
-	haxelib test hxssl.zip
+$(NDLL): $(SRC_CPP)
+	@echo "\nBuilding ndll for $(OS) ($(MACHINE))\n"
+	@(cd src;haxelib run hxcpp build.xml $(NDLL_FLAGS))
 
-haxelib-submit: haxelib-zip
-	haxelib submit hxssl.zip
+ndll: $(NDLL)
 
-install: build
-	cp $(NDLL) $(INSTALL_PATH)
-	
+examples: $(SRC_HX)
+	@(cd examples/01-*/;haxe build.hxml $(HXCPP_FLAGS))
+	#@(cd examples/02-*/;haxe build.hxml $(HXCPP_FLAGS))
+	@(cd examples/03-*/;haxe build.hxml $(HXCPP_FLAGS))
+
+test-cpp: $(SRC_HX) test/*.hx*
+	@(cd test;haxe build-cpp.hxml $(HXCPP_FLAGS))
+	@(cd test;./test)
+
+test-neko: $(SRC_HX) test/*.hx*
+	@(cd test;haxe build-neko.hxml;neko test.n)
+
+test: test-cpp test-neko
+
+hxssl.zip: clean ndll
+	zip -r $@ ndll/ src/build.xml src/*.cpp examples/ haxe/ java/ sys/ test/ Makefile haxelib.json README.md -x "*.o"
+
+haxelib: hxssl.zip
+
+install: haxelib
+	haxelib local hxssl.zip
+
+uninstall:
+	haxelib remove hxssl
+
 clean:
-	rm -f src/*.o $(NDLL) hxssl.zip
+	rm -f $(NDLL)
+	rm -rf src/obj
+	rm -f src/all_objs
+	rm -f src/*.o
+	rm -rf test/cpp
+	rm -f test/test*
+	rm -f $(PROJECT).zip
+	cd examples && rm -rf 0*-*/cpp 0*-*/cs 0*-*/java && rm -f 0*-*/test-*
 
-.PHONY: all build install clean
+.PHONY: ndll examples test test-cpp test-neko haxelib install uninstall clean

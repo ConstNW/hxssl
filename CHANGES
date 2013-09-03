@@ -1,0 +1,18 @@
+
+## hxssl
+
+-3.0.0-alpha.2:
+	fixed nekoapi initialization
+
+3.0.0-alpha:
+	haxe 3 support
+	hxcpp support
+	hxcpp buildchain
+	sys package
+	manual cert locations
+	sys.crypto.Base64
+	sys.crypto.MD5
+	sys.crypto.SHA1
+	sys.crypto.RIPEMD160
+	added basic unit tests
+	added new examples/references

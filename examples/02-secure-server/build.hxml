@@ -1,0 +1,11 @@
+
+-lib hxssl
+-main TestSecureSocketServer
+--each
+
+--next
+-neko test.n
+
+--next
+-cpp cpp
+-cmd mv cpp/TestSecureSocketServer ./test
