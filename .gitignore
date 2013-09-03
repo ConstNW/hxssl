@@ -1,0 +1,11 @@
+*.o
+*sublime-*
+TODO
+_*
+.zip
+*.n
+*/cpp/*
+*.crt
+*.csr
+*.key
+*/all_objs
